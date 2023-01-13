@@ -8,7 +8,7 @@ Orbit is a **free, open source social network server** where users can post on p
 
 Orbit speaks ActivityPub, an open federation protocol powering many Fediverse applications.
 
-This project is in the very early development stages, and will evolve rapidly as time goes on. PRs and contributors are welcome to pitch in and create a truly open and decentralized alternative to popular photo sharing social networks.
+This project is in the very early development stages, and will evolve rapidly as time goes on. PRs and contributors are welcome to pitch in and create a truly open and decentralized forum and social network.
 
 # Supported Features
 
