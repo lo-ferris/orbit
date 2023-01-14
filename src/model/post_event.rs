@@ -207,7 +207,7 @@ impl ActivityConvertible for PostEvent {
           if let Some(content_type) = &a.content_type {
             let abs_uri = match uri.starts_with("http") {
               true => uri.clone(),
-              false => format!("{}/{}", SETTINGS.server.cdn_fqdn, uri),
+              false => format!("{}{}", SETTINGS.server.cdn_fqdn, uri),
             };
 
             Some(Reference::Embedded(Box::new(

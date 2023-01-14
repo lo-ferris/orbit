@@ -12,6 +12,7 @@ import {
   IOrbit,
   IPost,
   IProfile,
+  IUpdatePost,
   JobStatus,
   submitOrbit,
   submitOrbitImage,
@@ -19,6 +20,7 @@ import {
   submitPostImage,
   submitProfile,
   submitProfileImage,
+  updatePost,
 } from '@/core/api'
 import React, { useReducer, createContext, useMemo, useContext } from 'react'
 import retry from 'async-retry'
@@ -28,6 +30,9 @@ enum CreateActionType {
   REFRESH_ORBIT_LOADING = 'REFRESH_ORBIT_LOADING',
   REFRESH_ORBIT_ERROR = 'REFRESH_ORBIT_ERROR',
   REFRESH_ORBIT_LOADED = 'REFRESH_ORBIT_LOADED',
+  REFRESH_POST_LOADING = 'REFRESH_POST_LOADING',
+  REFRESH_POST_ERROR = 'REFRESH_POST_ERROR',
+  REFRESH_POST_LOADED = 'REFRESH_POST_LOADED',
   DISMISS = 'DISMISS',
   SUBMIT_POST_SENDING_METADATA = 'SUBMIT_POST_SENDING_METADATA',
   SUBMIT_POST_SENDING_IMAGE = 'SUBMIT_POST_SENDING_IMAGE',
@@ -55,7 +60,7 @@ interface CreateAction {
   orbitData?: IObjectResponse<IOrbit>
   error?: any
   post?: IPost
-  newPostMetadata?: INewPost
+  newPostMetadata?: INewPost | IUpdatePost
   newPostFiles?: File[]
   newPostJobId?: string
   newPost?: IPost
@@ -72,14 +77,37 @@ interface CreateAction {
 
 export async function createActionInitialize(
   orbitShortcode: string | undefined,
+  postId: string | undefined,
   authToken: string | undefined,
   dispatch: React.Dispatch<CreateAction>
 ) {
   dispatch({
     type: CreateActionType.INITIALIZE,
   })
+  let shortcode = orbitShortcode
 
-  if (!orbitShortcode) {
+  if (postId) {
+    dispatch({
+      type: CreateActionType.REFRESH_POST_LOADING,
+    })
+
+    try {
+      const post = await fetchPost(postId)
+      shortcode = post.data.orbit_shortcode
+
+      dispatch({
+        type: CreateActionType.REFRESH_POST_LOADED,
+        post: post.data,
+      })
+    } catch (error) {
+      dispatch({
+        type: CreateActionType.REFRESH_POST_ERROR,
+        error,
+      })
+    }
+  }
+
+  if (!shortcode) {
     return
   }
 
@@ -88,10 +116,10 @@ export async function createActionInitialize(
   })
 
   try {
-    const post = await fetchOrbit(orbitShortcode, authToken)
+    const orbit = await fetchOrbit(shortcode, authToken)
     dispatch({
       type: CreateActionType.REFRESH_ORBIT_LOADED,
-      orbitData: post,
+      orbitData: orbit,
     })
   } catch (error) {
     dispatch({
@@ -173,6 +201,37 @@ export async function createActionSubmitPost(
         randomize: true,
       }
     )
+  } catch (error) {
+    dispatch({
+      type: CreateActionType.SUBMIT_POST_ERROR,
+      error,
+    })
+  }
+}
+
+export async function createActionUpdatePost(
+  postId: string,
+  post: IUpdatePost,
+  authToken: string | undefined,
+  dispatch: React.Dispatch<CreateAction>
+) {
+  if (!authToken) {
+    return
+  }
+
+  dispatch({
+    type: CreateActionType.SUBMIT_POST_SENDING_METADATA,
+    newPostMetadata: post,
+  })
+
+  try {
+    await updatePost(postId, post, authToken)
+
+    const ret = await fetchPost(postId, authToken)
+    return dispatch({
+      type: CreateActionType.SUBMIT_POST_COMPLETED,
+      newPost: ret.data,
+    })
   } catch (error) {
     dispatch({
       type: CreateActionType.SUBMIT_POST_ERROR,
@@ -284,14 +343,17 @@ export interface ICreateState {
   initialized: boolean
   orbit?: IOrbit
   selectedPost?: IPost
+  defaultFormValues?: INewPost | IUpdatePost | null
   orbitLoading: boolean
   orbitLoadingFailed: boolean
+  postLoading: boolean
+  postLoadingFailed: boolean
   submitting: boolean
   submittingMetadata: boolean
   submittingImage: boolean
   submittingImageProgress?: number
   submittingFailed: boolean
-  submittingPost?: INewPost | null
+  submittingPost?: INewPost | IUpdatePost | null
   submittingOrbit?: INewOrbit | null
   submittingProfile?: INewProfile | null
   submittingFiles?: File[] | null
@@ -305,6 +367,8 @@ const initialState: ICreateState = {
   initialized: false,
   orbitLoading: false,
   orbitLoadingFailed: false,
+  postLoading: false,
+  postLoadingFailed: false,
   submitting: false,
   submittingMetadata: false,
   submittingImage: false,
@@ -340,6 +404,20 @@ const reducer = (state: ICreateState, action: CreateAction): ICreateState => {
         orbitLoading: false,
         orbitLoadingFailed: false,
         orbit: action.orbitData?.data,
+      }
+    case CreateActionType.REFRESH_POST_LOADING:
+      return { ...state, postLoading: true }
+    case CreateActionType.REFRESH_POST_ERROR:
+      return { ...state, postLoading: false, postLoadingFailed: true }
+    case CreateActionType.REFRESH_POST_LOADED:
+      return {
+        ...state,
+        postLoading: false,
+        postLoadingFailed: false,
+        defaultFormValues: {
+          title: action.post?.title,
+          content_md: action.post?.content_md,
+        },
       }
     case CreateActionType.DISMISS:
       return {

@@ -10,6 +10,7 @@ import dayjsUtc from 'dayjs/plugin/utc'
 import dayjsLocalizedFormat from 'dayjs/plugin/localizedFormat'
 import {
   postActionDeleteComment,
+  postActionDeletePost,
   postActionLoadAuthor,
   postActionLoadComments,
   postActionLoadOrbit,
@@ -61,13 +62,8 @@ export default function PostPage({
   }, [post, postId, dispatch, session, loading, loadingFailed])
 
   useEffect(() => {
-    if (
-      !orbitLoading &&
-      !orbitLoadingFailed &&
-      !!post?.orbit_shortcode &&
-      !orbit
-    ) {
-      postActionLoadOrbit(post.orbit_shortcode, session?.access_token, dispatch)
+    if (!orbitLoading && !orbitLoadingFailed && !!post?.orbit_id && !orbit) {
+      postActionLoadOrbit(post.orbit_id, session?.access_token, dispatch)
     }
   }, [orbit, post, dispatch, orbitLoading, orbitLoadingFailed, session])
 
@@ -100,6 +96,11 @@ export default function PostPage({
     commentsLoadingFailed,
     session,
   ])
+
+  const handleDeletePost = (postId: string) => {
+    postActionDeletePost(postId, session?.access_token, dispatch)
+    router.replace('/')
+  }
 
   const shouldDisplay =
     !loading &&
@@ -153,6 +154,7 @@ export default function PostPage({
                 dispatch
               )
             }
+            onDeletePost={handleDeletePost}
           />
         )}
       </div>

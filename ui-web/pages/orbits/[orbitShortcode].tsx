@@ -25,6 +25,8 @@ import InfoCard, { InfoCardAction } from '@/components/atoms/InfoCard'
 import dayjs from 'dayjs'
 import dayjsUtc from 'dayjs/plugin/utc'
 import { useProfile } from '@/components/organisms/ProfileContext'
+import AnchorLink from '@/components/quarks/AnchorLink'
+import FeedAlertCard from '@/components/atoms/FeedAlertCard'
 
 dayjs.extend(dayjsUtc)
 
@@ -146,7 +148,11 @@ export default function OrbitPage({
     const values: InfoCardAction[] = [
       {
         title: 'Post Something',
-        href: `/orbits/${orbitShortcode}/new-post`,
+        href: `/orbits/${
+          orbit.is_external
+            ? encodeURIComponent(orbit.fediverse_id)
+            : orbit.shortcode
+        }/new-post`,
         button: 'default',
       },
     ]
@@ -215,7 +221,8 @@ export default function OrbitPage({
       </Head>
       <SideNav />
       {orbit &&
-        orbit.shortcode === orbitShortcode &&
+        (orbit.shortcode === orbitShortcode ||
+          orbit.fediverse_id === orbitShortcode) &&
         feedOrbit?.orbit_id === orbit.orbit_id && (
           <>
             <div className="orbit-page-orbit__feed">
@@ -230,6 +237,19 @@ export default function OrbitPage({
                     hideOrbitInformation
                   />
                 ))}
+              {!loading &&
+                !loadingFailed &&
+                feed.length === 0 &&
+                orbit.is_external && (
+                  <FeedAlertCard>
+                    We don&apos;t have any content for this remote orbit yet,
+                    you can see all the posts for this orbit by{' '}
+                    <AnchorLink href={orbit.uri} target="blank">
+                      visiting the orbit directly
+                    </AnchorLink>
+                    .
+                  </FeedAlertCard>
+                )}
             </div>
             <aside className="orbit-page-orbit__sidebar">
               <InfoCard

@@ -1,0 +1,31 @@
+.orbit-feed-alert-card {
+  display: flex;
+  overflow-y: hidden;
+  flex-direction: column;
+}
+
+.orbit-feed-alert-card__title,
+.orbit-feed-alert-card__content {
+  margin-left: 26px;
+  margin-right: 26px;
+}
+
+.orbit-feed-alert-card__title {
+  margin-top: 10px;
+  margin-bottom: 12px;
+}
+
+.orbit-feed-alert-card__content h1,
+.orbit-feed-alert-card__content h2 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+}
+
+.orbit-feed-alert-card__content p,
+.orbit-feed-alert-card__content h3,
+.orbit-feed-alert-card__content h4,
+.orbit-feed-alert-card__content h5,
+.orbit-feed-alert-card__content h6 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+}

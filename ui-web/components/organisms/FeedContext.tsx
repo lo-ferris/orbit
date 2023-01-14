@@ -76,7 +76,12 @@ export async function feedActionLoadFeed(
       async () => {
         let result: IListResponse<IPost>
         if (orbit) {
-          result = await fetchOrbitFeed(orbit.shortcode, authToken, page, 20)
+          result = await fetchOrbitFeed(
+            orbit.is_external ? orbit.fediverse_id : orbit.shortcode,
+            authToken,
+            page,
+            20
+          )
         } else if (friendsOnly) {
           if (!authToken) {
             throw new Error('Unauthorized')

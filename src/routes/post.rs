@@ -43,6 +43,15 @@ pub struct PostUpload {
   images: Vec<Tempfile>,
 }
 
+// TODO: Allow for changing post visibility, which will then control whether the post is now federated out to other people,
+//       or defederated via Tombstones
+
+#[derive(Deserialize)]
+pub struct PostUpdateRequest {
+  pub title: Option<String>,
+  pub content_md: Option<String>,
+}
+
 pub async fn api_get_user_own_feed(
   sessions: web::Data<SessionPool>,
   posts: web::Data<PostPool>,
@@ -231,7 +240,10 @@ pub async fn api_get_orbit_feed(
 ) -> impl Responder {
   let orbit_id = match orbits.fetch_orbit_id_from_shortcode(&orbit_shortcode).await {
     Some(id) => id,
-    None => return build_api_not_found(orbit_shortcode.to_string()),
+    None => match orbits.fetch_orbit_id_from_fediverse_id(&orbit_shortcode).await {
+      Some(id) => id,
+      None => return build_api_not_found(orbit_shortcode.to_owned()),
+    },
   };
 
   let page = query.page.unwrap_or(0);
@@ -386,6 +398,66 @@ pub async fn api_create_post(
       CreatePostResult::JobQueued(job_id) => HttpResponse::Ok().json(JobResponse { job_id }),
     },
     Err(err) => build_api_err(500, err.to_string(), Some(err.to_string())),
+  }
+}
+
+pub async fn api_update_post(
+  sessions: web::Data<SessionPool>,
+  posts: web::Data<PostPool>,
+  req: web::Json<PostUpdateRequest>,
+  post_id: web::Path<Uuid>,
+  jwt: web::ReqData<JwtContext>,
+  queue: web::Data<Queue>,
+  jobs: web::Data<JobPool>,
+) -> impl Responder {
+  let props = match require_auth(&jwt, &sessions).await {
+    Ok(props) => props,
+    Err(res) => return res,
+  };
+
+  let mut post = match posts.fetch_by_id(&post_id).await {
+    Ok(post) => post,
+    Err(err) => return map_api_err(err),
+  };
+
+  if post.user_id != props.uid {
+    return build_api_not_found(post_id.to_string());
+  }
+
+  if let Some(title) = &req.title {
+    post.title = Some(title.to_owned());
+  }
+
+  if let Some(content_md) = &req.content_md {
+    post.content_md = content_md.to_owned();
+    post.content_html = markdown::to_html(content_md);
+  }
+
+  if let Err(err) = posts.update_post_content(&post).await {
+    return map_api_err(err);
+  }
+
+  let job_id = match jobs
+    .create(NewJob {
+      created_by_id: Some(props.uid.to_owned()),
+      status: JobStatus::NotStarted,
+      record_id: Some(post_id.to_owned()),
+      associated_record_id: post.orbit_id,
+    })
+    .await
+  {
+    Ok(job_id) => job_id,
+    Err(err) => return map_api_err(err),
+  };
+
+  let job = QueueJob::builder()
+    .job_id(job_id)
+    .job_type(QueueJobType::UpdatePost)
+    .build();
+
+  match queue.send_job(job).await {
+    Ok(_) => HttpResponse::Ok().finish(),
+    Err(err) => map_api_err(err),
   }
 }
 

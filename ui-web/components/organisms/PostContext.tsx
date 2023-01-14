@@ -1,9 +1,10 @@
 import {
   createPostComment,
   createPostCommentLike,
+  deletePost,
   deletePostComment,
   deletePostCommentLike,
-  fetchOrbit,
+  fetchOrbitById,
   fetchPost,
   fetchPostComments,
   fetchUserProfile,
@@ -35,6 +36,7 @@ enum PostActionType {
   UPDATE_POST_COMMENTING = 'UPDATE_POST_COMMENTING',
   UPDATE_POST_COMMENT_FAILED = 'UPDATE_POST_COMMENT_FAILED',
   UPDATE_POST_COMMENTED = 'UPDATE_POST_COMMENTED',
+  DELETE_POST = 'DELETE_POST',
   DELETE_COMMENT = 'DELETE_COMMENT',
   SELECT_COMMENT = 'SELECT_COMMENT',
   SELECT_POST = 'SELECT_POST',
@@ -89,7 +91,7 @@ export async function postActionLoadOrbit(
   })
 
   try {
-    const post = await fetchOrbit(orbitShortcode, authToken)
+    const post = await fetchOrbitById(orbitShortcode, authToken)
     dispatch({
       type: PostActionType.REFRESH_ORBIT_LOADED,
       orbitData: post,
@@ -266,6 +268,26 @@ export async function postActionDeleteComment(
   }
 }
 
+export async function postActionDeletePost(
+  postId: string,
+  authToken: string | undefined,
+  dispatch: React.Dispatch<PostAction>
+) {
+  if (!authToken) {
+    return
+  }
+
+  dispatch({
+    type: PostActionType.DELETE_POST,
+  })
+
+  try {
+    await deletePost(postId, authToken)
+  } catch (err) {
+    console.error(err)
+  }
+}
+
 export interface IPostState {
   post?: IPost
   author?: IProfile
@@ -371,6 +393,10 @@ const reducer = (state: IPostState, action: PostAction): IPostState => {
         author: action.authorData,
       }
     case PostActionType.DISMISS_POST:
+      return {
+        ...initialState,
+      }
+    case PostActionType.DELETE_POST:
       return {
         ...initialState,
       }

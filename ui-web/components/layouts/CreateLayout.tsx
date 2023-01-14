@@ -36,6 +36,7 @@ const transparentPixelUri = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAA
 export interface CreateLayoutProps extends HTMLProps<HTMLDivElement> {
   orbitShortcode?: string
   embedded?: boolean
+  postId?: string
 }
 
 export interface CreateFormProps
@@ -448,6 +449,7 @@ export function CreateFormFileUpload(props: CreateFormFileUploadGroupProps) {
 export default function CreateLayout({
   title,
   orbitShortcode,
+  postId,
   embedded,
   className,
   children,
@@ -470,9 +472,14 @@ export default function CreateLayout({
 
   useEffect(() => {
     if (!initialized && !embedded) {
-      createActionInitialize(orbitShortcode, session?.access_token, dispatch)
+      createActionInitialize(
+        orbitShortcode,
+        postId,
+        session?.access_token,
+        dispatch
+      )
     }
-  }, [initialized, dispatch, orbitShortcode, session, embedded])
+  }, [initialized, dispatch, orbitShortcode, postId, session, embedded])
 
   useEffect(() => {
     if (!!submittedPost && !embedded) {
@@ -500,7 +507,7 @@ export default function CreateLayout({
 
   useEffect(() => {
     if (!session && !embedded) {
-      router.replace(`/api/oauth/login`)
+      router.replace(`/api/auth/login`)
     }
   }, [session, router, embedded])
 

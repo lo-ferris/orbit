@@ -1,8 +1,8 @@
 use actix_easy_multipart::{tempfile::Tempfile, MultipartForm};
 use actix_web::{web, HttpResponse, Responder};
 use rsa::{
-  pkcs1::{EncodeRsaPrivateKey, EncodeRsaPublicKey},
-  pkcs8::LineEnding,
+  pkcs1::EncodeRsaPrivateKey,
+  pkcs8::{EncodePublicKey, LineEnding},
   RsaPrivateKey, RsaPublicKey,
 };
 use serde::{Deserialize, Serialize};
@@ -181,7 +181,10 @@ pub async fn api_get_orbit_named(
 
   let orbit_id = match orbits.fetch_orbit_id_from_shortcode(&orbit_shortcode).await {
     Some(id) => id,
-    None => return build_api_not_found(orbit_shortcode.to_string()),
+    None => match orbits.fetch_orbit_id_from_fediverse_id(&orbit_shortcode).await {
+      Some(id) => id,
+      None => return build_api_not_found(orbit_shortcode.to_owned()),
+    },
   };
 
   let orbit = match orbits.fetch_orbit_for_user(&orbit_id, &user_id).await {
@@ -238,7 +241,7 @@ pub async fn api_create_orbit(
     Err(err) => return build_api_err(500, err.to_string(), Some(err.to_string())),
   };
 
-  let pub_key = match pub_key.to_pkcs1_pem(LineEnding::LF) {
+  let pub_key = match pub_key.to_public_key_pem(LineEnding::LF) {
     Ok(key) => key.to_string(),
     Err(err) => return build_api_err(500, err.to_string(), Some(err.to_string())),
   };

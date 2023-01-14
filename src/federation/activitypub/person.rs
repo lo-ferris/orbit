@@ -78,7 +78,7 @@ pub async fn federate_remove_follow(
   follows.delete_follow(&actor.user_id, &unfollowed_user.user_id).await?;
 
   Ok(FederateResult::Accept((
-    unfollowed_user.fediverse_id,
+    unfollowed_user.fediverse_uri,
     unfollowed_user.private_key,
   )))
 }
@@ -170,11 +170,6 @@ pub async fn federate_ext_join_group(actor: &User, joining_orbit: &Uuid, orbits:
     None => return Err(LogicErr::MissingRecord),
   };
 
-  let obj = match orbit.to_object(&actor.fediverse_uri) {
-    Some(obj) => obj,
-    None => return Err(LogicErr::MissingRecord),
-  };
-
   let response_object = Object::builder()
     .kind(Some(ActivityType::Follow.to_string()))
     .id(Some(format!("{}/{}", SETTINGS.server.api_fqdn, Uuid::new_v4())))
@@ -184,7 +179,7 @@ pub async fn federate_ext_join_group(actor: &User, joining_orbit: &Uuid, orbits:
     ))))
     .activity(Some(
       ActivityProps::builder()
-        .object(Some(Reference::Embedded(Box::new(obj))))
+        .object(Some(Reference::Remote(orbit.fediverse_uri)))
         .build(),
     ))
     .build();

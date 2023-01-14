@@ -1,3 +1,5 @@
+use crate::model::args::Args;
+use clap::Parser;
 use config::Config;
 use lazy_static::lazy_static;
 use serde::Deserialize;
@@ -156,7 +158,7 @@ impl Settings {
     }
   }
 
-  fn new() -> Self {
+  fn new(config_path: &Option<String>) -> Self {
     let run_mode = env::var("RUN_MODE").unwrap_or_else(|_| "development".into());
 
     let mut builder = Config::builder()
@@ -165,6 +167,10 @@ impl Settings {
 
     if run_mode != "production" {
       builder = builder.add_source(config::File::with_name("config/local").required(false));
+    }
+
+    if let Some(config_path) = config_path {
+      builder = builder.add_source(config::File::with_name(config_path).required(false))
     }
 
     let settings = builder.add_source(config::Environment::with_prefix("orbit")).build();
@@ -186,5 +192,8 @@ impl Settings {
 }
 
 lazy_static! {
-  pub static ref SETTINGS: Settings = Settings::new();
+  pub static ref SETTINGS: Settings = {
+    let args = Args::parse();
+    Settings::new(&args.config_path)
+  };
 }

@@ -41,7 +41,7 @@ export default function PostCard({
   }
 
   return (
-    <Link legacyBehavior href={post.uri}>
+    <Link legacyBehavior href={`/feed/${post.post_id}`}>
       <a
         className={cx('orbit-post-card', className, {
           'orbit-post-card--image-post':

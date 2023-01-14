@@ -18,8 +18,6 @@ mod routes;
 mod settings;
 mod work_queue;
 
-use std::time::Duration;
-
 use actix_cors::Cors;
 use actix_web::middleware::Logger;
 use actix_web::{web, App, HttpServer};
@@ -29,10 +27,13 @@ use db::repository::Repository;
 use deadpool::Runtime;
 use deadpool_postgres::{ManagerConfig, RecyclingMethod};
 use env_logger::WriteStyle;
+use rabbitmq::clients::RabbitMQClient;
+use std::time::Duration;
+use tokio_postgres::NoTls;
+
 use helpers::types::{ACTIVITYPUB_ACCEPT_GUARD, HTML_GUARD};
 use log::LevelFilter;
 use net::jwt_session::JwtSession;
-use rabbitmq::clients::RabbitMQClient;
 use routes::activitypub::{
   api_activitypub_federate_orbit_inbox, api_activitypub_federate_shared_inbox, api_activitypub_federate_user_inbox,
   api_activitypub_get_comment, api_activitypub_get_comments, api_activitypub_get_federated_orbit_posts,
@@ -59,7 +60,7 @@ use routes::orbit::{
 use routes::post::{
   api_boost_post, api_create_post, api_delete_post, api_get_global_feed, api_get_orbit_feed, api_get_orbit_feed_by_id,
   api_get_post, api_get_user_friends_feed, api_get_user_liked_posts, api_get_user_own_feed, api_get_user_post,
-  api_get_user_posts, api_unboost_post, api_upload_post_image,
+  api_get_user_posts, api_unboost_post, api_update_post, api_upload_post_image,
 };
 use routes::public::web_serve_static;
 use routes::redirect::{
@@ -67,6 +68,7 @@ use routes::redirect::{
   api_redirect_to_orbit_members, api_redirect_to_post, api_redirect_to_post_comment, api_redirect_to_post_comments,
   api_redirect_to_user, api_redirect_to_user_followers, api_redirect_to_user_following,
 };
+use routes::search::api_search;
 use routes::status::api_get_server_status;
 use routes::user::{
   api_get_profile, api_get_user_followers, api_get_user_following, api_get_user_profile, api_get_user_stats,
@@ -74,7 +76,6 @@ use routes::user::{
 };
 use routes::webfinger::api_webfinger_query_resource;
 use settings::SETTINGS;
-use tokio_postgres::NoTls;
 use work_queue::queue::Queue;
 
 #[actix_web::main]
@@ -291,6 +292,7 @@ async fn main() -> std::io::Result<()> {
           .route(web::get().guard(HTML_GUARD).to(api_redirect_to_post))
           .route(web::get().to(api_get_post))
           .route(web::post().to(api_upload_post_image))
+          .route(web::put().to(api_update_post))
           .route(web::delete().to(api_delete_post)),
       )
       .service(
@@ -431,6 +433,11 @@ async fn main() -> std::io::Result<()> {
           .route(web::delete().to(api_delete_orbit_moderator)),
       )
       .service(
+        web::resource("/api/search")
+          .name("search")
+          .route(web::get().to(api_search)),
+      )
+      .service(
         web::resource("/api/federate/activitypub/user/{user_id}/inbox")
           .name("federate_activitypub")
           .route(web::post().to(api_activitypub_federate_user_inbox)),
@@ -471,7 +478,7 @@ async fn main() -> std::io::Result<()> {
           .route(web::get().to(api_get_nodeinfo_2_1)),
       )
       .service(
-        web::resource("/{path:.*}")
+        web::resource("/api/static/{path:.*}")
           .name("static_files")
           .route(web::get().to(web_serve_static)),
       )

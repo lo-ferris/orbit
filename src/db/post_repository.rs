@@ -319,8 +319,8 @@ impl PostRepo for DbPostRepo {
   async fn create_post_from(&self, post: Post) -> Result<(), LogicErr> {
     let db = self.db.get().await.map_err(map_db_err)?;
     db.execute(
-      "INSERT INTO posts (post_id, user_id, uri, is_external, content_md, content_html, visibility, created_at, updated_at, deletion_scheduled_at, orbit_id) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+      "INSERT INTO posts (post_id, user_id, uri, is_external, content_md, content_html, title, visibility, created_at, updated_at, deletion_scheduled_at, orbit_id) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
       &[
         &post.post_id,
         &post.user_id,
@@ -328,6 +328,7 @@ impl PostRepo for DbPostRepo {
         &post.is_external,
         &post.content_md,
         &post.content_html,
+        &post.title,
         &post.visibility.to_string(),
         &post.created_at,
         &post.updated_at,
@@ -401,7 +402,7 @@ impl PostRepo for DbPostRepo {
   async fn update_post_content(&self, post: &Post) -> Result<(), LogicErr> {
     let db = self.db.get().await.map_err(map_db_err)?;
     db.execute(
-      "UPDATE posts SET content_html = $2, content_md = $3, visibility = $4, created_at = $5, updated_at = $6 WHERE post_id = $1",
+      "UPDATE posts SET content_html = $2, content_md = $3, visibility = $4, created_at = $5, updated_at = $6, title = $7 WHERE post_id = $1",
       &[
         &post.post_id,
         &post.content_html,
@@ -409,6 +410,7 @@ impl PostRepo for DbPostRepo {
         &post.visibility.to_string(),
         &post.created_at,
         &post.updated_at,
+        &post.title,
       ],
     )
     .await

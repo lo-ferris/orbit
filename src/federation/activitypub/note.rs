@@ -50,6 +50,27 @@ pub async fn federate_create_note(
     None => return Err(LogicErr::InvalidData),
   };
 
+  if let Ok(Some(post)) = posts.fetch_post_from_uri(&uri, &Some(actor.user_id)).await {
+    let job_id = jobs
+      .create(NewJob {
+        created_by_id: Some(actor.user_id),
+        status: JobStatus::NotStarted,
+        record_id: Some(post.post_id),
+        associated_record_id: None,
+      })
+      .await
+      .map_err(map_db_err)?;
+
+    let job = QueueJob::builder()
+      .job_id(job_id)
+      .job_type(QueueJobType::CreatePostEvents)
+      .build();
+
+    queue.send_job(job).await?;
+
+    return Ok(FederateResult::None);
+  };
+
   let attachments: Vec<Object> = match deref_activitypub_ref_list(&activity_object.attachment).await {
     Some(obj) => obj
       .into_iter()
@@ -100,6 +121,14 @@ pub async fn federate_create_note(
     },
   };
 
+  let title = match activity_object.summary {
+    Some(content) => match content {
+      RdfString::Raw(content) => Some(content),
+      RdfString::Props(props) => Some(props.string),
+    },
+    None => None,
+  };
+
   let content_md = match activity_object.source {
     Some(source) => {
       if source.media_type == "text/markdown" {
@@ -124,7 +153,7 @@ pub async fn federate_create_note(
     orbit_id: None,
     uri,
     is_external: true,
-    title: None,
+    title,
     content_md,
     content_html,
     visibility: access,
@@ -257,6 +286,14 @@ pub async fn federate_update_note(
     None => "".to_string(),
   };
 
+  let title = match activity_object.summary {
+    Some(content) => match content {
+      RdfString::Raw(content) => Some(content),
+      RdfString::Props(props) => Some(props.string),
+    },
+    None => None,
+  };
+
   let created_at = match activity_object.published {
     Some(date) => date,
     None => return Err(LogicErr::InvalidData),
@@ -267,6 +304,7 @@ pub async fn federate_update_note(
   post.visibility = access;
   post.created_at = created_at;
   post.updated_at = created_at;
+  post.title = title;
 
   posts.update_post_content(&post).await?;
 
@@ -370,11 +408,12 @@ pub async fn federate_ext_delete_note(post_id: &Uuid, actor: &User, dest_actor: 
   let uri = format!("{}/feed/{}", SETTINGS.server.api_fqdn, post_id);
   let obj = Object::builder()
     .kind(Some(ObjectType::Tombstone.to_string()))
+    .id(Some(uri.clone()))
     .url(Some(Reference::Remote(uri)))
     .build();
 
   let response_object = Object::builder()
-    .kind(Some(ActivityType::Update.to_string()))
+    .kind(Some(ActivityType::Delete.to_string()))
     .id(Some(format!("{}/{}", SETTINGS.server.api_fqdn, Uuid::new_v4())))
     .actor(Some(Reference::Remote(format!(
       "{}{}",

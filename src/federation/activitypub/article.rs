@@ -12,7 +12,7 @@ use crate::{
   },
   db::{
     job_repository::JobPool, orbit_repository::OrbitPool, post_attachment_repository::PostAttachmentPool,
-    post_repository::PostPool, user_orbit_repository::UserOrbitPool,
+    post_repository::PostPool,
   },
   helpers::api::map_db_err,
   logic::LogicErr,
@@ -41,17 +41,9 @@ pub async fn federate_create_article(
   jobs: &JobPool,
   post_attachments: &PostAttachmentPool,
   orbits: &OrbitPool,
-  user_orbits: &UserOrbitPool,
   queue: &Queue,
 ) -> Result<FederateResult, LogicErr> {
   let orbit = federate_orbit_group(&activity_object.audience, orbits).await?;
-
-  let members = user_orbits.fetch_orbit_user_ids(&orbit.orbit_id).await?;
-
-  // Skip federating posts from users that our instance's users don't follow or orbits that have no followers
-  if members.is_empty() {
-    return Ok(FederateResult::None);
-  }
 
   let uri = match activity_object.id {
     Some(uri) => uri,
@@ -387,11 +379,12 @@ pub async fn federate_ext_delete_article(post_id: &Uuid, actor: &User, dest_acto
   let uri = format!("{}/feed/{}", SETTINGS.server.api_fqdn, post_id);
   let obj = Object::builder()
     .kind(Some(ObjectType::Tombstone.to_string()))
+    .id(Some(uri.clone()))
     .url(Some(Reference::Remote(uri)))
     .build();
 
   let response_object = Object::builder()
-    .kind(Some(ActivityType::Update.to_string()))
+    .kind(Some(ActivityType::Delete.to_string()))
     .id(Some(format!("{}/{}", SETTINGS.server.api_fqdn, Uuid::new_v4())))
     .actor(Some(Reference::Remote(format!(
       "{}{}",

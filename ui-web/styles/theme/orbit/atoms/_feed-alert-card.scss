@@ -1,0 +1,61 @@
+.#{$theme-class} {
+  .orbit-feed-alert-card {
+    border-radius: 8px;
+    user-select: none;
+    position: relative;
+    text-decoration: none;
+
+    @media (prefers-color-scheme: light) {
+      background: $fill-2-light;
+      border: 0.5px solid $fill-3-light;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      background: $fill-2-dark;
+      border: 0.5px solid $fill-3-dark;
+    }
+  }
+
+  .orbit-feed-alert-card__title {
+    font-size: $font-size-xl;
+    font-weight: $font-weight-medium;
+
+    @media (prefers-color-scheme: light) {
+      color: $text-light;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      color: $text-dark;
+    }
+  }
+
+  .orbit-feed-alert-card__content {
+    font-size: $font-size-l;
+    font-weight: $font-weight-regular;
+    padding: 1.5rem;
+
+    * {
+      font-size: $font-size-l;
+      font-weight: $font-weight-regular;
+      margin: 0;
+      margin-bottom: $font-size-l;
+      padding: 0;
+
+      &:last-of-type {
+        margin-bottom: 0;
+      }
+    }
+
+    img {
+      display: none;
+    }
+
+    @media (prefers-color-scheme: light) {
+      color: $text-light;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      color: $text-dark;
+    }
+  }
+}

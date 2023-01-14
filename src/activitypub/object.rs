@@ -42,6 +42,8 @@ pub enum ObjectType {
   Person,
   Service,
   Mention,
+  OrderedCollection,
+  OrderedCollectionPage,
 }
 
 impl ObjectType {

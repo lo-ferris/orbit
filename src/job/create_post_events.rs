@@ -46,18 +46,20 @@ pub async fn create_post_events(
 
   let post = posts.fetch_by_id(&post_id).await?;
 
-  let own_event = NewEvent {
-    source_user_id: user_id,
-    target_user_id: None,
-    visibility: post.visibility.clone(),
-    post_id: Some(post_id),
-    like_id: None,
-    comment_id: None,
-    event_type: EventType::Post,
-  };
+  if !post.is_external {
+    let own_event = NewEvent {
+      source_user_id: user_id,
+      target_user_id: None,
+      visibility: post.visibility.clone(),
+      post_id: Some(post_id),
+      like_id: None,
+      comment_id: None,
+      event_type: EventType::Post,
+    };
 
-  if let Err(err) = events.create_event(own_event).await.map_err(map_ext_err) {
-    warn!("Failed to create user's own event for new post: {}", err);
+    if let Err(err) = events.create_event(own_event).await.map_err(map_ext_err) {
+      warn!("Failed to create user's own event for new post: {}", err);
+    }
   }
 
   if let Some(orbit_id) = post.orbit_id {
@@ -65,7 +67,7 @@ pub async fn create_post_events(
       Some(orbit) => {
         let user = users.fetch_by_id(&user_id).await?;
 
-        if orbit.is_external {
+        if orbit.is_external && !post.is_external {
           federate_ext(
             FederateExtAction::CreatePost(post_id),
             &user,

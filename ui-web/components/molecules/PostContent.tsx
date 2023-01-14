@@ -8,8 +8,11 @@ import dayjsRelative from 'dayjs/plugin/relativeTime'
 import {
   IoBookmarkOutline,
   IoChatboxOutline,
+  IoCreateOutline,
   IoEyeOffOutline,
   IoFlagOutline,
+  IoPencilOutline,
+  IoTrashBinOutline,
 } from 'react-icons/io5'
 import { LazyImage } from '../quarks/LazyImage'
 import Config from '@/core/config'
@@ -29,6 +32,7 @@ export interface PostContentProps extends HTMLProps<HTMLDivElement> {
   hideOrbitInformation?: boolean
   onAddComment?: (postId: string) => void
   onDeleteComment?: (postId: string, commentId: string) => void
+  onDeletePost?: (postId: string) => void
 }
 
 export default function PostContent({
@@ -40,11 +44,16 @@ export default function PostContent({
   className,
   onAddComment,
   onDeleteComment,
+  onDeletePost,
   ...rest
 }: PostContentProps) {
   const {
     state: { profile },
   } = useProfile()
+  const postEligibleForModification =
+    post.user_id === profile?.user_id &&
+    dayjs.utc().isBefore(dayjs.utc(post.created_at).add(1, 'hour'))
+
   return (
     <div className={cx('orbit-post-content', className)} {...rest}>
       <div className="orbit-post-content__info-bar">
@@ -167,6 +176,26 @@ export default function PostContent({
           <IoFlagOutline />
           Report
         </Link>
+        {postEligibleForModification && (
+          <Link
+            className="orbit-post-content__command"
+            role="button"
+            href={`/feed/${post.post_id}/edit`}
+          >
+            <IoCreateOutline />
+            Edit
+          </Link>
+        )}
+        {postEligibleForModification && (
+          <div
+            className="orbit-post-content__command"
+            onClick={() => onDeletePost?.(post.post_id)}
+            role="button"
+          >
+            <IoTrashBinOutline />
+            Delete
+          </div>
+        )}
       </div>
       {comments.length > 0 && (
         <div className="orbit-post-content__comments">

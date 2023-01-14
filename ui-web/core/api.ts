@@ -116,10 +116,16 @@ export interface IPost {
 }
 
 export interface INewPost {
+  title?: string
   content_md: string
   visibility: AccessType
   orbit_name?: string
   attachment_count: number
+}
+
+export interface IUpdatePost {
+  title?: string
+  content_md?: string
 }
 
 export enum JobStatus {
@@ -166,6 +172,7 @@ export interface IOrbit {
   banner_uri?: string
   uri: string
   is_external: boolean
+  fediverse_id: string
 }
 
 export interface IOrbitProfile extends IOrbit {
@@ -207,6 +214,11 @@ interface IProfileUpdateRequest {
   url_3_title?: IPatchProp
   url_4_title?: IPatchProp
   url_5_title?: IPatchProp
+}
+
+export interface ISearchResult {
+  user?: IProfile
+  orbit?: IOrbit
 }
 
 export async function fetchProfile(authToken: string): Promise<IProfile> {
@@ -347,7 +359,9 @@ export async function fetchOrbitFeed(
   pageSize: number = 20
 ): Promise<IListResponse<IPost>> {
   const response = await fetch(
-    `${Config.apiUri}/orbits/${shortcode}/feed?page=${page}&page_size=${pageSize}`,
+    `${Config.apiUri}/orbits/${encodeURIComponent(
+      shortcode
+    )}/feed?page=${page}&page_size=${pageSize}`,
     {
       ...(authToken
         ? buildDefaultHeaders(authToken)
@@ -403,12 +417,15 @@ export async function fetchOrbit(
   shortcode: string,
   authToken: string | undefined
 ): Promise<IObjectResponse<IOrbitProfile>> {
-  const response = await fetch(`${Config.apiUri}/orbits/${shortcode}`, {
-    ...(authToken
-      ? buildDefaultHeaders(authToken)
-      : buildUnauthenticatedHeaders()),
-    method: 'GET',
-  })
+  const response = await fetch(
+    `${Config.apiUri}/orbits/${encodeURIComponent(shortcode)}`,
+    {
+      ...(authToken
+        ? buildDefaultHeaders(authToken)
+        : buildUnauthenticatedHeaders()),
+      method: 'GET',
+    }
+  )
 
   if (response.status !== 200) {
     throw new Error('Request failed')
@@ -450,6 +467,22 @@ export async function submitPost(
   }
 
   return await response.json()
+}
+
+export async function updatePost(
+  postId: string,
+  post: IUpdatePost,
+  authToken: string
+): Promise<void> {
+  const response = await fetch(`${Config.apiUri}/feed/${postId}`, {
+    ...buildDefaultHeaders(authToken),
+    method: 'PUT',
+    body: JSON.stringify(post),
+  })
+
+  if (response.status !== 200) {
+    throw new Error('Request failed')
+  }
 }
 
 export function submitPostImage(
@@ -594,6 +627,20 @@ export async function createPostComment(
   }
 
   return await response.json()
+}
+
+export async function deletePost(
+  postId: string,
+  authToken: string
+): Promise<void> {
+  const response = await fetch(`${Config.apiUri}/feed/${postId}`, {
+    ...buildDefaultHeaders(authToken),
+    method: 'DELETE',
+  })
+
+  if (response.status !== 200) {
+    throw new Error('Request failed')
+  }
 }
 
 export async function deletePostComment(
@@ -911,4 +958,27 @@ export async function leaveOrbit(
   if (response.status !== 201) {
     throw new Error('Request failed')
   }
+}
+
+export async function fetchSearchResult(
+  term: string,
+  authToken: string | undefined,
+  page: number,
+  pageSize: number = 20
+): Promise<IListResponse<ISearchResult>> {
+  const response = await fetch(
+    `${Config.apiUri}/search?term=${term}&page=${page}&page_size=${pageSize}`,
+    {
+      ...(authToken
+        ? buildDefaultHeaders(authToken)
+        : buildUnauthenticatedHeaders()),
+      method: 'GET',
+    }
+  )
+
+  if (response.status !== 200) {
+    throw new Error('Request failed')
+  }
+
+  return await response.json()
 }
