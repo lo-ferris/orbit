@@ -67,6 +67,13 @@ pub fn activitypub_ref_to_uri(obj_ref: &Reference<Object>) -> Option<String> {
   }
 }
 
+pub fn activitypub_obj_to_uri(obj_ref: &Option<Box<Object>>) -> Option<String> {
+  match obj_ref {
+    Some(obj) => obj.id.clone(),
+    None => None,
+  }
+}
+
 pub fn activitypub_ref_to_uri_opt(obj_ref: &Option<Reference<Object>>) -> Option<String> {
   match obj_ref {
     Some(obj_ref) => activitypub_ref_to_uri(obj_ref),

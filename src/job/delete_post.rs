@@ -2,8 +2,9 @@ use uuid::Uuid;
 
 use crate::{
   db::{
-    follow_repository::FollowPool, job_repository::JobPool, orbit_repository::OrbitPool, post_repository::PostPool,
-    user_orbit_repository::UserOrbitPool, user_repository::UserPool,
+    comment_repository::CommentPool, follow_repository::FollowPool, job_repository::JobPool,
+    orbit_repository::OrbitPool, post_repository::PostPool, user_orbit_repository::UserOrbitPool,
+    user_repository::UserPool,
   },
   federation::activitypub::{federate_ext, FederateExtAction, FederateExtActor, FederateExtActorRef},
   helpers::api::map_db_err,
@@ -23,6 +24,7 @@ pub async fn delete_post(
   users: &UserPool,
   posts: &PostPool,
   follows: &FollowPool,
+  comments: &CommentPool,
   queue: &Queue,
 ) -> Result<(), LogicErr> {
   let job = match jobs.fetch_optional_by_id(&job_id).await {
@@ -52,6 +54,7 @@ pub async fn delete_post(
             &FederateExtActor::Group(orbit),
             posts,
             orbits,
+            comments,
           )
           .await?;
           return Ok(());

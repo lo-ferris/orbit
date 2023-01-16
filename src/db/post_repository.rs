@@ -304,11 +304,12 @@ impl PostRepo for DbPostRepo {
   ) -> Result<Uuid, LogicErr> {
     let post_id = Uuid::new_v4();
     let uri = format!("/feed/{}", post_id);
+    let replies_uri = format!("/feed/{}/comments", post_id);
 
     let db = self.db.get().await.map_err(map_db_err)?;
     let row = db.query_one(
-      "INSERT INTO posts (post_id, user_id, content_md, content_html, visibility, uri, orbit_id, title, is_external) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, false) RETURNING post_id",
-      &[&post_id, &user_id, &content_md, &content_html, &visibility.to_string(), &uri, &orbit_id, &title],
+      "INSERT INTO posts (post_id, user_id, content_md, content_html, visibility, uri, replies_uri, orbit_id, title, is_external) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false) RETURNING post_id",
+      &[&post_id, &user_id, &content_md, &content_html, &visibility.to_string(), &uri, &replies_uri, &orbit_id, &title],
     )
     .await
     .map_err(map_db_err)?;
@@ -319,12 +320,13 @@ impl PostRepo for DbPostRepo {
   async fn create_post_from(&self, post: Post) -> Result<(), LogicErr> {
     let db = self.db.get().await.map_err(map_db_err)?;
     db.execute(
-      "INSERT INTO posts (post_id, user_id, uri, is_external, content_md, content_html, title, visibility, created_at, updated_at, deletion_scheduled_at, orbit_id) 
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)",
+      "INSERT INTO posts (post_id, user_id, uri, replies_uri, is_external, content_md, content_html, title, visibility, created_at, updated_at, deletion_scheduled_at, orbit_id) 
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)",
       &[
         &post.post_id,
         &post.user_id,
         &post.uri,
+        &post.replies_uri,
         &post.is_external,
         &post.content_md,
         &post.content_html,

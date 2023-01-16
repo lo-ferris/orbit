@@ -392,6 +392,7 @@ mod tests {
       event_type: EventType::Post,
       post_id,
       uri: "a".to_string(),
+      replies_uri: "b".to_string(),
       title: None,
       content_md: "a".to_string(),
       content_html: "a".to_string(),
@@ -417,6 +418,7 @@ mod tests {
       orbit_fediverse_uri: None,
       orbit_avatar_uri: None,
       orbit_shortcode: None,
+      is_external: false,
     };
 
     let mut post_repo = MockPostRepo::new();

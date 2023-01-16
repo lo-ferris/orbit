@@ -8,11 +8,13 @@ use uuid::Uuid;
 use crate::{
   activitypub::{
     activity_convertible::ActivityConvertible,
-    object::{Object, ObjectSource},
+    collection::CollectionProps,
+    object::{Object, ObjectSource, ObjectType},
     rdf_string::RdfString,
     reference::Reference,
   },
   db::FromRow,
+  helpers::api::relative_to_absolute_uri,
   settings::SETTINGS,
 };
 
@@ -24,6 +26,7 @@ pub struct CommentPub {
   pub comment_id: Uuid,
   pub user_id: Uuid,
   pub post_id: Uuid,
+  // TODO: Add post_uri to
   pub content_md: String,
   pub content_html: String,
   pub created_at: DateTime<Utc>,
@@ -37,6 +40,9 @@ pub struct CommentPub {
   pub liked: Option<bool>,
   #[serde(skip)]
   pub visibility: AccessType,
+  pub is_external: bool,
+  pub uri: String,
+  pub replies_uri: String,
 }
 
 impl FromRow for CommentPub {
@@ -55,17 +61,15 @@ impl FromRow for CommentPub {
       likes: row.get("likes"),
       liked: row.get("liked"),
       visibility: AccessType::from_str(row.get("visibility")).unwrap_or_default(),
+      is_external: row.get("is_external"),
+      uri: row.get("uri"),
+      replies_uri: row.get("replies_uri"),
     })
   }
 }
 
 impl ActivityConvertible for CommentPub {
   fn to_object(&self, actor: &str) -> Option<Object> {
-    let id = format!(
-      "{}/feed/{}/comments/{}",
-      SETTINGS.server.api_fqdn, self.post_id, self.comment_id
-    );
-
     let attributed_to_uri = format!("{}/user/{}", SETTINGS.server.api_fqdn, self.user_id);
     let cc_uri = format!("{}/followers", actor);
     let in_reply_to_uri = format!("{}/feed/{}", SETTINGS.server.api_fqdn, self.post_id);
@@ -75,24 +79,42 @@ impl ActivityConvertible for CommentPub {
       AccessType::Unlisted => None,
       AccessType::Private => None,
       AccessType::FollowersOnly => Some(Reference::Remote::<Object>(cc_uri.clone())),
-      AccessType::PublicLocal => Some(Reference::Remote::<Object>(
-        "https://www.w3.org/ns/activitystreams#Local".to_string(),
-      )),
-      AccessType::PublicFederated => Some(Reference::Remote::<Object>(
-        "https://www.w3.org/ns/activitystreams#Public".to_string(),
-      )),
+      AccessType::PublicLocal => Some(Reference::Mixed::<Object>(vec![
+        Reference::Remote::<Object>("https://www.w3.org/ns/activitystreams#Local".to_string()),
+        Reference::Remote::<Object>(cc_uri.clone()),
+      ])),
+      AccessType::PublicFederated => Some(Reference::Mixed::<Object>(vec![
+        Reference::Remote::<Object>("https://www.w3.org/ns/activitystreams#Public".to_string()),
+        Reference::Remote::<Object>(cc_uri.clone()),
+      ])),
       _ => None,
     };
 
+    let replies_collection_items = match self.is_external {
+      true => self.replies_uri.clone(),
+      false => format!("{}?page=0&page_size=20", relative_to_absolute_uri(&self.replies_uri)),
+    };
+
+    let replies_collection = Object::builder()
+      .kind(Some("OrderedCollection".to_string()))
+      .id(Some(self.replies_uri.clone()))
+      .collection(Some(
+        CollectionProps::builder()
+          .items(Some(Reference::Remote(replies_collection_items)))
+          .build(),
+      ))
+      .build();
+
     Some(
       Object::builder()
-        .id(Some(id.clone()))
-        .kind(Some("Note".to_string()))
-        .url(Some(Reference::Remote(id)))
+        .id(Some(self.uri.clone()))
+        .kind(Some(ObjectType::Note.to_string()))
+        .url(Some(Reference::Remote(self.uri.clone())))
         .attributed_to(Some(Reference::Remote(attributed_to_uri)))
         .cc(Some(Reference::Mixed(vec![Reference::Remote(cc_uri)])))
         .to(to)
         .content(Some(RdfString::Raw(self.content_html.clone())))
+        .replies(Some(Box::new(replies_collection)))
         .source(Some(
           ObjectSource::builder()
             .content(self.content_md.clone())

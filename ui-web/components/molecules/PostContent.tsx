@@ -18,11 +18,14 @@ import { LazyImage } from '../quarks/LazyImage'
 import Config from '@/core/config'
 import { cdnUrl } from '@/core/utils'
 import { useProfile } from '../organisms/ProfileContext'
+import Turndown from 'turndown'
 
 dayjs.extend(dayjsUtc)
 dayjs.extend(dayjsRelative)
 
 const transparentPixelUri = `data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=`
+
+const turndown = new Turndown()
 
 export interface PostContentProps extends HTMLProps<HTMLDivElement> {
   post: IPost
@@ -30,9 +33,24 @@ export interface PostContentProps extends HTMLProps<HTMLDivElement> {
   commentsCount?: number
   comments: IComment[]
   hideOrbitInformation?: boolean
-  onAddComment?: (postId: string) => void
+  onAddComment?: (postId: string, replyToContent?: string) => void
   onDeleteComment?: (postId: string, commentId: string) => void
   onDeletePost?: (postId: string) => void
+}
+
+function quoteText(text: string): string {
+  let ret = text
+  // Fairly rudimentary test to see if text is html-like to avoid user confusion in the editor
+  if (/(<([^>]+)>)/i.test(text.trim())) {
+    ret = turndown.turndown(text)
+  }
+
+  return (
+    ret
+      .split(/\n|\r\n?/)
+      .map((line) => `> ${line}`)
+      .join('\n') + '\n\n'
+  )
 }
 
 export default function PostContent({
@@ -226,12 +244,25 @@ export default function PostContent({
                 dangerouslySetInnerHTML={{ __html: comment.content_html }}
               />
               <div className="orbit-post-content__commands">
-                <Link
+                <div
                   className="orbit-post-content__command"
-                  href={`/feed/${post.post_id}/comments/${comment.comment_id}/new-comment`}
+                  role="button"
+                  onClick={() => {
+                    if (!!post.orbit_shortcode) {
+                      onAddComment?.(
+                        post.post_id,
+                        quoteText(comment.content_md || comment.content_html)
+                      )
+                    } else {
+                      onAddComment?.(
+                        post.post_id,
+                        `${comment.user_fediverse_id} `
+                      )
+                    }
+                  }}
                 >
                   Reply
-                </Link>
+                </div>
                 <div className="orbit-post-content__command" role="button">
                   Save
                 </div>

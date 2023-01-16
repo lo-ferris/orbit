@@ -10,9 +10,11 @@ mod clean_jobs;
 mod convert_new_post_images;
 mod create_boost_event;
 mod create_boost_events;
+mod create_comment;
 mod create_post_event;
 mod create_post_events;
 mod delete_boost_events;
+mod delete_comment;
 mod delete_post;
 mod federate_activitypub;
 mod federate_activitypub_ext;
@@ -21,6 +23,7 @@ mod refresh_external_orbit;
 mod refresh_external_orbits;
 mod refresh_external_profile;
 mod refresh_external_profiles;
+mod update_comment;
 mod update_post;
 
 pub async fn delegate_job(
@@ -48,6 +51,7 @@ pub async fn delegate_job(
         &repositories.user_orbits,
         &repositories.orbits,
         &repositories.users,
+        &repositories.comments,
         queue_job.job_id,
         queue,
       )
@@ -60,6 +64,7 @@ pub async fn delegate_job(
         &repositories.events,
         &repositories.users,
         &repositories.orbits,
+        &repositories.comments,
         queue_job.job_id,
       )
       .await
@@ -88,6 +93,7 @@ pub async fn delegate_job(
         &repositories.users,
         &repositories.posts,
         &repositories.follows,
+        &repositories.comments,
         queue,
       )
       .await
@@ -100,6 +106,49 @@ pub async fn delegate_job(
         &repositories.user_orbits,
         &repositories.users,
         &repositories.posts,
+        &repositories.follows,
+        &repositories.comments,
+        queue,
+      )
+      .await
+    }
+    QueueJobType::CreateComment => {
+      create_comment::create_comment(
+        queue_job.job_id,
+        &repositories.jobs,
+        &repositories.orbits,
+        &repositories.user_orbits,
+        &repositories.users,
+        &repositories.posts,
+        &repositories.comments,
+        &repositories.follows,
+        queue,
+      )
+      .await
+    }
+    QueueJobType::UpdateComment => {
+      update_comment::update_comment(
+        queue_job.job_id,
+        &repositories.jobs,
+        &repositories.orbits,
+        &repositories.user_orbits,
+        &repositories.users,
+        &repositories.posts,
+        &repositories.comments,
+        &repositories.follows,
+        queue,
+      )
+      .await
+    }
+    QueueJobType::DeleteComment => {
+      delete_comment::delete_comment(
+        queue_job.job_id,
+        &repositories.jobs,
+        &repositories.orbits,
+        &repositories.user_orbits,
+        &repositories.users,
+        &repositories.posts,
+        &repositories.comments,
         &repositories.follows,
         queue,
       )

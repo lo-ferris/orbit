@@ -2,8 +2,8 @@ use uuid::Uuid;
 
 use crate::{
   db::{
-    event_repository::EventPool, job_repository::JobPool, orbit_repository::OrbitPool, post_repository::PostPool,
-    user_repository::UserPool,
+    comment_repository::CommentPool, event_repository::EventPool, job_repository::JobPool, orbit_repository::OrbitPool,
+    post_repository::PostPool, user_repository::UserPool,
   },
   federation::activitypub::{federate_ext, FederateExtAction, FederateExtActor},
   helpers::api::map_ext_err,
@@ -17,6 +17,7 @@ pub async fn create_post_event(
   events: &EventPool,
   users: &UserPool,
   orbits: &OrbitPool,
+  comments: &CommentPool,
   job_id: Uuid,
 ) -> Result<(), LogicErr> {
   let job = match jobs.fetch_optional_by_id(&job_id).await {
@@ -61,6 +62,7 @@ pub async fn create_post_event(
       &FederateExtActor::Person(dest_user),
       posts,
       orbits,
+      comments,
     )
     .await;
   }

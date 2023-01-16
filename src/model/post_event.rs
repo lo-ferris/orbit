@@ -31,6 +31,7 @@ pub struct PostEvent {
   pub post_id: Uuid,
   pub orbit_id: Option<Uuid>,
   pub uri: String,
+  pub replies_uri: String,
   pub title: Option<String>,
   pub content_md: String,
   pub content_html: String,
@@ -59,6 +60,7 @@ pub struct PostEvent {
   pub orbit_fediverse_uri: Option<String>,
   pub orbit_avatar_uri: Option<String>,
   pub attachments: Vec<PostAttachment>,
+  pub is_external: bool,
 }
 
 impl FromRow for PostEvent {
@@ -67,6 +69,7 @@ impl FromRow for PostEvent {
       event_type: EventType::from_str(row.get("event_type")).unwrap_or_default(),
       post_id: row.get("post_id"),
       uri: row.get("uri"),
+      replies_uri: row.get("replies_uri"),
       title: row.get("title"),
       content_md: row.get("content_md"),
       content_html: row.get("content_html"),
@@ -92,6 +95,7 @@ impl FromRow for PostEvent {
       orbit_fediverse_uri: row.get("orbit_fediverse_uri"),
       orbit_avatar_uri: row.get("orbit_avatar_uri"),
       attachments: vec![],
+      is_external: row.get("is_external"),
     })
   }
 }
@@ -147,12 +151,14 @@ impl ActivityConvertible for PostEvent {
       AccessType::Unlisted => None,
       AccessType::Private => Some(Reference::Remote::<Object>(actor_uri.clone())),
       AccessType::FollowersOnly => Some(Reference::Remote::<Object>(actor_follower_feed_uri)),
-      AccessType::PublicLocal => Some(Reference::Remote::<Object>(
-        "https://www.w3.org/ns/activitystreams#Local".to_string(),
-      )),
-      AccessType::PublicFederated => Some(Reference::Remote::<Object>(
-        "https://www.w3.org/ns/activitystreams#Public".to_string(),
-      )),
+      AccessType::PublicLocal => Some(Reference::Mixed::<Object>(vec![
+        Reference::Remote::<Object>("https://www.w3.org/ns/activitystreams#Local".to_string()),
+        Reference::Remote::<Object>(actor_follower_feed_uri),
+      ])),
+      AccessType::PublicFederated => Some(Reference::Mixed::<Object>(vec![
+        Reference::Remote::<Object>("https://www.w3.org/ns/activitystreams#Public".to_string()),
+        Reference::Remote::<Object>(actor_follower_feed_uri),
+      ])),
       _ => None,
     };
 
@@ -184,17 +190,19 @@ impl ActivityConvertible for PostEvent {
 
     let summary = self.title.as_ref().map(|title| RdfString::Raw(title.to_owned()));
 
-    let base_uri = format!("{}/feed/{}", SETTINGS.server.api_fqdn, self.post_id);
+    let base_uri = relative_to_absolute_uri(&self.uri);
+
+    let replies_collection_items = match self.is_external {
+      true => self.replies_uri.clone(),
+      false => format!("{}?page=0&page_size=20", relative_to_absolute_uri(&self.replies_uri)),
+    };
 
     let replies_collection = Object::builder()
       .kind(Some("OrderedCollection".to_string()))
-      .id(Some(format!("{}/comments", base_uri)))
+      .id(Some(self.replies_uri.clone()))
       .collection(Some(
         CollectionProps::builder()
-          .items(Some(Reference::Remote(format!(
-            "{}/comments?page=0&page_size=20",
-            base_uri
-          ))))
+          .items(Some(Reference::Remote(replies_collection_items)))
           .build(),
       ))
       .build();

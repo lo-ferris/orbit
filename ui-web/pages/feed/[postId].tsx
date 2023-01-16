@@ -52,6 +52,9 @@ export default function PostPage({
     initialCommentLoadComplete,
   } = state
   const [commentModalOpen, setCommentModalOpen] = useState(false)
+  const [defaultCommentBody, setDefaultCommentBody] = useState<
+    string | undefined
+  >()
 
   const postId = (router.query.postId || '') as string
 
@@ -144,7 +147,10 @@ export default function PostPage({
             commentsLoading={commentsLoading}
             comments={comments}
             commentsCount={totalComments}
-            onAddComment={() => setCommentModalOpen(true)}
+            onAddComment={(_postId, defaultCommentBody) => {
+              setDefaultCommentBody(defaultCommentBody)
+              setCommentModalOpen(true)
+            }}
             onDeleteComment={(postId, commentId) =>
               postActionDeleteComment(
                 profile?.user_id || '',
@@ -190,6 +196,10 @@ export default function PostPage({
                 title: 'Post a comment',
                 href: `/feed/${post.post_id}/new-comment`,
                 button: 'default',
+                action: (e) => {
+                  e.preventDefault()
+                  setCommentModalOpen(true)
+                },
               },
             ]}
           >
@@ -200,8 +210,12 @@ export default function PostPage({
       {post && (
         <NewCommentModal
           open={commentModalOpen}
-          onClose={() => setCommentModalOpen(false)}
+          onClose={() => {
+            setDefaultCommentBody(undefined)
+            setCommentModalOpen(false)
+          }}
           postId={post.post_id}
+          defaultCommentBody={defaultCommentBody}
         />
       )}
     </section>

@@ -1,6 +1,9 @@
 use uuid::Uuid;
 
-use super::util::{activitypub_ref_to_uri_opt, deref_activitypub_ref_list, send_activitypub_object, FederateResult};
+use super::util::{
+  activitypub_obj_to_uri, activitypub_ref_to_uri_opt, deref_activitypub_ref_list, send_activitypub_object,
+  FederateResult,
+};
 use crate::{
   activitypub::{
     activity::ActivityProps,
@@ -12,7 +15,7 @@ use crate::{
     reference::Reference,
   },
   db::{
-    follow_repository::FollowPool, job_repository::JobPool, like_repository::LikePool,
+    comment_repository::CommentPool, follow_repository::FollowPool, job_repository::JobPool, like_repository::LikePool,
     post_attachment_repository::PostAttachmentPool, post_repository::PostPool,
   },
   helpers::api::map_db_err,
@@ -48,6 +51,11 @@ pub async fn federate_create_note(
   let uri = match activity_object.id {
     Some(uri) => uri,
     None => return Err(LogicErr::InvalidData),
+  };
+
+  let replies_uri = match activitypub_obj_to_uri(&activity_object.replies) {
+    Some(uri) => uri,
+    None => uri.clone(),
   };
 
   if let Ok(Some(post)) = posts.fetch_post_from_uri(&uri, &Some(actor.user_id)).await {
@@ -152,6 +160,7 @@ pub async fn federate_create_note(
     user_id: actor.user_id,
     orbit_id: None,
     uri,
+    replies_uri,
     is_external: true,
     title,
     content_md,
@@ -357,6 +366,46 @@ pub async fn federate_ext_create_note(
   send_activitypub_object(response_uri, doc, &actor.fediverse_uri, &actor.private_key).await
 }
 
+pub async fn federate_ext_create_comment_note(
+  comment_id: &Uuid,
+  actor: &User,
+  dest_actor: &User,
+  comments: &CommentPool,
+) -> Result<(), LogicErr> {
+  let comment = match comments.fetch_comment_pub_by_id(comment_id, &Some(actor.user_id)).await {
+    Some(comment) => comment,
+    None => return Err(LogicErr::MissingRecord),
+  };
+
+  let obj = match comment.to_object(&actor.fediverse_uri) {
+    Some(obj) => obj,
+    None => return Err(LogicErr::MissingRecord),
+  };
+
+  let response_object = Object::builder()
+    .kind(Some(ActivityType::Create.to_string()))
+    .id(Some(format!("{}/{}", SETTINGS.server.api_fqdn, Uuid::new_v4())))
+    .actor(Some(Reference::Remote(format!(
+      "{}{}",
+      SETTINGS.server.api_fqdn, actor.fediverse_uri
+    ))))
+    .activity(Some(
+      ActivityProps::builder()
+        .object(Some(Reference::Embedded(Box::new(obj))))
+        .build(),
+    ))
+    .build();
+
+  let doc = ActivityPubDocument::new(response_object);
+
+  let response_uri = match &dest_actor.ext_apub_inbox_uri {
+    Some(uri) => uri,
+    None => return Ok(()),
+  };
+
+  send_activitypub_object(response_uri, doc, &actor.fediverse_uri, &actor.private_key).await
+}
+
 pub async fn federate_ext_update_note(
   post_id: &Uuid,
   actor: &User,
@@ -403,9 +452,87 @@ pub async fn federate_ext_update_note(
   send_activitypub_object(response_uri, doc, &actor.fediverse_uri, &actor.private_key).await
 }
 
+pub async fn federate_ext_update_comment_note(
+  comment_id: &Uuid,
+  actor: &User,
+  dest_actor: &User,
+  comments: &CommentPool,
+) -> Result<(), LogicErr> {
+  let comment = match comments.fetch_comment_pub_by_id(comment_id, &Some(actor.user_id)).await {
+    Some(comment) => comment,
+    None => return Err(LogicErr::MissingRecord),
+  };
+
+  let obj = match comment.to_object(&actor.fediverse_uri) {
+    Some(obj) => obj,
+    None => return Err(LogicErr::MissingRecord),
+  };
+
+  let response_object = Object::builder()
+    .kind(Some(ActivityType::Update.to_string()))
+    .id(Some(format!("{}/{}", SETTINGS.server.api_fqdn, Uuid::new_v4())))
+    .actor(Some(Reference::Remote(format!(
+      "{}{}",
+      SETTINGS.server.api_fqdn, actor.fediverse_uri
+    ))))
+    .activity(Some(
+      ActivityProps::builder()
+        .object(Some(Reference::Embedded(Box::new(obj))))
+        .build(),
+    ))
+    .build();
+
+  let doc = ActivityPubDocument::new(response_object);
+
+  let response_uri = match &dest_actor.ext_apub_inbox_uri {
+    Some(uri) => uri,
+    None => return Ok(()),
+  };
+
+  send_activitypub_object(response_uri, doc, &actor.fediverse_uri, &actor.private_key).await
+}
+
 pub async fn federate_ext_delete_note(post_id: &Uuid, actor: &User, dest_actor: &User) -> Result<(), LogicErr> {
   // NOTE: By this point, the post is deleted in our DB, so we have to build the URI from scratch here
   let uri = format!("{}/feed/{}", SETTINGS.server.api_fqdn, post_id);
+  let obj = Object::builder()
+    .kind(Some(ObjectType::Tombstone.to_string()))
+    .id(Some(uri.clone()))
+    .url(Some(Reference::Remote(uri)))
+    .build();
+
+  let response_object = Object::builder()
+    .kind(Some(ActivityType::Delete.to_string()))
+    .id(Some(format!("{}/{}", SETTINGS.server.api_fqdn, Uuid::new_v4())))
+    .actor(Some(Reference::Remote(format!(
+      "{}{}",
+      SETTINGS.server.api_fqdn, actor.fediverse_uri
+    ))))
+    .activity(Some(
+      ActivityProps::builder()
+        .object(Some(Reference::Embedded(Box::new(obj))))
+        .build(),
+    ))
+    .build();
+
+  let doc = ActivityPubDocument::new(response_object);
+
+  let response_uri = match &dest_actor.ext_apub_inbox_uri {
+    Some(uri) => uri,
+    None => return Ok(()),
+  };
+
+  send_activitypub_object(response_uri, doc, &actor.fediverse_uri, &actor.private_key).await
+}
+
+pub async fn federate_ext_delete_comment_note(
+  post_id: &Uuid,
+  comment_id: &Uuid,
+  actor: &User,
+  dest_actor: &User,
+) -> Result<(), LogicErr> {
+  // NOTE: By this point, the comment is deleted in our DB, so we have to build the URI from scratch here
+  let uri = format!("{}/feed/{}/comments/{}", SETTINGS.server.api_fqdn, post_id, comment_id);
   let obj = Object::builder()
     .kind(Some(ObjectType::Tombstone.to_string()))
     .id(Some(uri.clone()))

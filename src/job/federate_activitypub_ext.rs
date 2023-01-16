@@ -47,6 +47,7 @@ pub async fn federate_activitypub(
     &dest_actor,
     &repositories.posts,
     &repositories.orbits,
+    &repositories.comments,
   )
   .await
 }

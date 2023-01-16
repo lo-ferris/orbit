@@ -3,8 +3,9 @@ use uuid::Uuid;
 
 use crate::{
   db::{
-    event_repository::EventPool, follow_repository::FollowPool, job_repository::JobPool, orbit_repository::OrbitPool,
-    post_repository::PostPool, user_orbit_repository::UserOrbitPool, user_repository::UserPool,
+    comment_repository::CommentPool, event_repository::EventPool, follow_repository::FollowPool,
+    job_repository::JobPool, orbit_repository::OrbitPool, post_repository::PostPool,
+    user_orbit_repository::UserOrbitPool, user_repository::UserPool,
   },
   federation::activitypub::{federate_ext, FederateExtAction, FederateExtActor},
   helpers::api::{map_db_err, map_ext_err},
@@ -26,6 +27,7 @@ pub async fn create_post_events(
   user_orbits: &UserOrbitPool,
   orbits: &OrbitPool,
   users: &UserPool,
+  comments: &CommentPool,
   job_id: Uuid,
   queue: &Queue,
 ) -> Result<(), LogicErr> {
@@ -74,6 +76,7 @@ pub async fn create_post_events(
             &FederateExtActor::Group(orbit),
             posts,
             orbits,
+            comments,
           )
           .await?;
         }

@@ -24,6 +24,7 @@ export interface NewCommentModalProps {
   postId: string
   open: boolean
   onClose: () => void
+  defaultCommentBody?: string
 }
 
 interface INewCommentForm {
@@ -34,6 +35,7 @@ export default function NewCommentModal({
   postId,
   open,
   onClose,
+  defaultCommentBody,
 }: NewCommentModalProps) {
   const { session } = useAuth()
   const { state, dispatch } = usePost()
@@ -72,7 +74,7 @@ export default function NewCommentModal({
       <CreateLayout embedded>
         <Formik
           initialValues={{
-            content_md: '',
+            content_md: defaultCommentBody || '',
           }}
           onSubmit={onSubmit}
         >

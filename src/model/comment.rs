@@ -15,6 +15,9 @@ pub struct Comment {
   pub content_html: String,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,
+  pub is_external: bool,
+  pub uri: String,
+  pub replies_uri: String,
 }
 
 impl FromRow for Comment {
@@ -27,6 +30,9 @@ impl FromRow for Comment {
       content_html: row.get("content_html"),
       created_at: row.get("created_at"),
       updated_at: row.get("updated_at"),
+      is_external: row.get("is_external"),
+      uri: row.get("uri"),
+      replies_uri: row.get("replies_uri"),
     })
   }
 }

@@ -1,7 +1,7 @@
 use crate::{
   db::{
-    comment_repository::CommentPool, follow_repository::FollowPool, post_repository::PostPool,
-    session_repository::SessionPool,
+    comment_repository::CommentPool, follow_repository::FollowPool, job_repository::JobPool, post_repository::PostPool,
+    session_repository::SessionPool, tombstone_repository::TombstonePool,
   },
   helpers::auth::{query_auth, require_auth},
   helpers::core::{build_api_err, map_api_err},
@@ -10,6 +10,7 @@ use crate::{
   },
   model::response::ObjectResponse,
   net::jwt::JwtContext,
+  work_queue::queue::Queue,
 };
 use actix_web::{web, HttpResponse, Responder};
 use serde::Deserialize;
@@ -34,13 +35,26 @@ pub async fn api_create_comment(
   post_id: web::Path<Uuid>,
   contents: web::Json<NewPost>,
   jwt: web::ReqData<JwtContext>,
+  jobs: web::Data<JobPool>,
+  queue: web::Data<Queue>,
 ) -> impl Responder {
   let props = match require_auth(&jwt, &sessions).await {
     Ok(props) => props,
     Err(res) => return res,
   };
 
-  match create_comment(&posts, &follows, &comments, &post_id, &props.uid, &contents.content_md).await {
+  match create_comment(
+    &posts,
+    &follows,
+    &comments,
+    &jobs,
+    &queue,
+    &post_id,
+    &props.uid,
+    &contents.content_md,
+  )
+  .await
+  {
     Ok(comment) => HttpResponse::Ok().json(ObjectResponse { data: comment }),
     Err(err) => build_api_err(500, err.to_string(), Some(err.to_string())),
   }
@@ -49,15 +63,18 @@ pub async fn api_create_comment(
 pub async fn api_delete_comment(
   sessions: web::Data<SessionPool>,
   comments: web::Data<CommentPool>,
+  tombstones: web::Data<TombstonePool>,
   ids: web::Path<(Uuid, Uuid)>,
   jwt: web::ReqData<JwtContext>,
+  jobs: web::Data<JobPool>,
+  queue: web::Data<Queue>,
 ) -> impl Responder {
   let props = match require_auth(&jwt, &sessions).await {
     Ok(props) => props,
     Err(res) => return res,
   };
 
-  match delete_comment(&comments, &ids.0, &ids.1, &props.uid).await {
+  match delete_comment(&comments, &jobs, &tombstones, &queue, &ids.0, &ids.1, &props.uid).await {
     Ok(_) => HttpResponse::Ok().finish(),
     Err(err) => map_api_err(err),
   }

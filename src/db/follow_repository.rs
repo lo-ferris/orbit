@@ -17,6 +17,7 @@ pub trait FollowRepo {
   async fn user_follows_poster(&self, post_id: &Uuid, user_id: &Uuid) -> bool;
   async fn user_follows_user(&self, following_user_id: &Uuid, followed_user_id: &Uuid) -> bool;
   async fn fetch_user_followers(&self, user_id: &Uuid) -> Option<Vec<Follow>>;
+  async fn fetch_user_external_follower_ids(&self, user_id: &Uuid) -> Option<Vec<Uuid>>;
 }
 
 pub type FollowPool = Arc<dyn FollowRepo + Send + Sync>;
@@ -123,5 +124,26 @@ impl FollowRepo for DbFollowRepo {
     };
 
     Some(rows.into_iter().flat_map(Follow::from_row).collect())
+  }
+
+  async fn fetch_user_external_follower_ids(&self, user_id: &Uuid) -> Option<Vec<Uuid>> {
+    let db = match self.db.get().await.map_err(map_db_err) {
+      Ok(db) => db,
+      Err(_) => return None,
+    };
+
+    let rows = match db
+      .query(
+        "SELECT f.user_id FROM followers f INNER JOIN users u ON f.user_id = u.user_id WHERE f.following_user_id = $1 AND f.user_id != f.following_user_id AND u.is_external = TRUE",
+        &[&user_id],
+      )
+      .await
+      .map_err(map_db_err)
+    {
+      Ok(rows) => rows,
+      Err(_) => return None,
+    };
+
+    Some(rows.into_iter().map(|r| r.get::<&str, Uuid>("user_id")).collect())
   }
 }

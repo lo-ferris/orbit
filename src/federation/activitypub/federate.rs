@@ -4,13 +4,15 @@ use uuid::Uuid;
 use super::{
   actor::{federate_orbit_group, federate_update_orbit_group, federate_update_user_actor, federate_user_actor},
   article::{
-    federate_create_article, federate_ext_create_article, federate_ext_delete_article, federate_ext_update_article,
-    federate_update_article,
+    federate_create_article, federate_ext_create_article, federate_ext_create_article_comment,
+    federate_ext_delete_article, federate_ext_delete_article_comment, federate_ext_update_article,
+    federate_ext_update_article_comment, federate_update_article,
   },
   group::{federate_create_member, federate_remove_member},
   note::{
-    federate_create_note, federate_ext_create_note, federate_ext_delete_note, federate_ext_update_note,
-    federate_like_note, federate_unlike_note, federate_update_note,
+    federate_create_note, federate_ext_create_comment_note, federate_ext_create_note, federate_ext_delete_comment_note,
+    federate_ext_delete_note, federate_ext_update_comment_note, federate_ext_update_note, federate_like_note,
+    federate_unlike_note, federate_update_note,
   },
   object::federate_delete_remote_object,
   person::{
@@ -31,9 +33,9 @@ use crate::{
     reference::Reference,
   },
   db::{
-    follow_repository::FollowPool, job_repository::JobPool, like_repository::LikePool, orbit_repository::OrbitPool,
-    post_attachment_repository::PostAttachmentPool, post_repository::PostPool, user_orbit_repository::UserOrbitPool,
-    user_repository::UserPool,
+    comment_repository::CommentPool, follow_repository::FollowPool, job_repository::JobPool, like_repository::LikePool,
+    orbit_repository::OrbitPool, post_attachment_repository::PostAttachmentPool, post_repository::PostPool,
+    user_orbit_repository::UserOrbitPool, user_repository::UserPool,
   },
   helpers::core::unwrap_or_fail,
   logic::LogicErr,
@@ -438,6 +440,9 @@ pub enum FederateExtAction {
   CreatePost(Uuid),
   UpdatePost(Uuid),
   DeletePost(Uuid),
+  CreateComment(Uuid),
+  UpdateComment(Uuid),
+  DeleteComment(Uuid, Uuid),
   FollowProfile,
   UnfollowProfile,
   FollowGroup(Uuid),
@@ -464,6 +469,7 @@ pub async fn federate_ext(
   dest_actor: &FederateExtActor,
   posts: &PostPool,
   orbits: &OrbitPool,
+  comments: &CommentPool,
 ) -> Result<(), LogicErr> {
   match action {
     FederateExtAction::CreatePost(post_id) => match dest_actor {
@@ -485,5 +491,32 @@ pub async fn federate_ext(
     FederateExtAction::UnfollowProfile => federate_ext_remove_follow(actor, dest_actor).await,
     FederateExtAction::FollowGroup(group_id) => federate_ext_join_group(actor, &group_id, orbits).await,
     FederateExtAction::UnfollowGroup(group_id) => federate_ext_leave_group(actor, &group_id, orbits).await,
+    FederateExtAction::CreateComment(comment_id) => match dest_actor {
+      FederateExtActor::Person(dest_actor) => {
+        federate_ext_create_comment_note(&comment_id, actor, dest_actor, comments).await
+      }
+      FederateExtActor::Group(dest_actor) => {
+        federate_ext_create_article_comment(&comment_id, actor, dest_actor, comments).await
+      }
+      FederateExtActor::None => Ok(()),
+    },
+    FederateExtAction::UpdateComment(comment_id) => match dest_actor {
+      FederateExtActor::Person(dest_actor) => {
+        federate_ext_update_comment_note(&comment_id, actor, dest_actor, comments).await
+      }
+      FederateExtActor::Group(dest_actor) => {
+        federate_ext_update_article_comment(&comment_id, actor, dest_actor, comments).await
+      }
+      FederateExtActor::None => Ok(()),
+    },
+    FederateExtAction::DeleteComment(post_id, comment_id) => match dest_actor {
+      FederateExtActor::Person(dest_actor) => {
+        federate_ext_delete_comment_note(&post_id, &comment_id, actor, dest_actor).await
+      }
+      FederateExtActor::Group(dest_actor) => {
+        federate_ext_delete_article_comment(&post_id, &comment_id, actor, dest_actor).await
+      }
+      FederateExtActor::None => Ok(()),
+    },
   }
 }
