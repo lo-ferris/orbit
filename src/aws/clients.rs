@@ -1,5 +1,5 @@
 use aws_config::{meta::region::RegionProviderChain, SdkConfig};
-use aws_types::credentials::SharedCredentialsProvider;
+use aws_credential_types::provider::SharedCredentialsProvider;
 use lazy_static::lazy_static;
 use once_cell::sync::OnceCell;
 

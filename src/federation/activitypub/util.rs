@@ -9,6 +9,7 @@ use crate::{
 };
 
 use backoff::{future::retry, ExponentialBackoff};
+use base64::{engine::general_purpose::STANDARD as b64, Engine};
 use http_signing::{alg::RsaSha256, Key, PrivateKey, SigningConfig};
 use lazy_static::lazy_static;
 use sha2::{Digest, Sha256};
@@ -130,7 +131,7 @@ pub async fn send_activitypub_object(
     let mut body_hasher = Sha256::new();
     body_hasher.update(body);
     let body_hash_digest = body_hasher.finalize();
-    let body_hash_digest = base64::encode(body_hash_digest);
+    let body_hash_digest = b64.encode(body_hash_digest);
 
     let digest = format!("SHA-256={}", body_hash_digest);
 
