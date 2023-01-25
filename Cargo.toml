@@ -24,7 +24,7 @@ serde_qs = "0.11.0"
 config = "0.13.3"
 lazy_static = "1.4.0"
 deadpool = "0.9.5"
-deadpool-postgres = "0.10.3"
+deadpool-postgres = "0.10.5"
 tokio-postgres = { version = "0.7.7", features = [
   "with-uuid-1",
   "with-chrono-0_4",
